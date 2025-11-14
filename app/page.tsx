@@ -3,7 +3,8 @@
 import { useState } from 'react';
 
 export default function Home() {
-  const [url, setUrl] = useState('');
+  const [owner, setOwner] = useState('');
+  const [repo, setRepo] = useState('');
   const [githubToken, setGithubToken] = useState('');
   const [username, setUsername] = useState('');
   const [isProving, setIsProving] = useState(false);
@@ -13,14 +14,22 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
 
   const handleProve = async () => {
-    if (!url.trim()) {
-      setError('Please enter a URL');
+    if (!owner.trim()) {
+      setError('Please enter the repository owner');
+      return;
+    }
+
+    if (!repo.trim()) {
+      setError('Please enter the repository name');
       return;
     }
 
     setIsProving(true);
     setError(null);
     setResult(null);
+
+    // Construct the GitHub API URL
+    const url = `https://api.github.com/repos/${owner.trim()}/${repo.trim()}/contributors`;
 
     try {
       const response = await fetch('/api/prove', {
@@ -29,7 +38,7 @@ export default function Home() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          url: url.trim(),
+          url,
           headers: [
             "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36",
             "Accept: application/vnd.github+json",
@@ -117,30 +126,79 @@ export default function Home() {
     }
   };
 
+  const handleDownloadProof = () => {
+    if (!presentation) return;
+    
+    const dataStr = JSON.stringify(presentation, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    // Include username in filename if available
+    const usernameStr = username.trim() ? `-${username.trim()}` : '';
+    link.download = `github-webproof-${new Date().toISOString().split('T')[0]}${usernameStr}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="min-h-screen bg-black text-white">
       <div className="container mx-auto px-4 py-16 max-w-2xl">
         <div className="text-center mb-12">
           <h1 className="text-4xl font-light mb-4">vlayer GitHub Prover</h1>
           <p className="text-gray-400 text-lg">Prove contributions to GitHub repositories</p>
+          <div className="mt-6">
+            <a
+              href="/verify-all"
+              className="inline-flex items-center px-4 py-2 text-sm text-gray-300 hover:text-white border border-gray-700 hover:border-gray-500 rounded-lg transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              </svg>
+              View All Verified Contributors
+            </a>
+          </div>
         </div>
 
         <div className="space-y-8">
-          {/* GitHub URL Input */}
-          <div className="space-y-4">
-            <label htmlFor="url" className="block text-sm font-medium text-gray-300">
-              GitHub API Contributors URL
-            </label>
-            <input
-              id="url"
-              type="url"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://api.github.com/repos/vlayer-xyz/vlayer/contributors"
-              className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#7235e5] focus:border-transparent text-white placeholder-gray-500"
-              disabled={isProving || isVerifying}
-            />
+          {/* GitHub Repository Inputs */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-4">
+              <label htmlFor="owner" className="block text-sm font-medium text-gray-300">
+                Repository Owner
+              </label>
+              <input
+                id="owner"
+                type="text"
+                value={owner}
+                onChange={(e) => setOwner(e.target.value)}
+                placeholder="vlayer-xyz"
+                className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#7235e5] focus:border-transparent text-white placeholder-gray-500"
+                disabled={isProving || isVerifying}
+              />
+            </div>
+            <div className="space-y-4">
+              <label htmlFor="repo" className="block text-sm font-medium text-gray-300">
+                Repository Name
+              </label>
+              <input
+                id="repo"
+                type="text"
+                value={repo}
+                onChange={(e) => setRepo(e.target.value)}
+                placeholder="vlayer"
+                className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#7235e5] focus:border-transparent text-white placeholder-gray-500"
+                disabled={isProving || isVerifying}
+              />
+            </div>
           </div>
+          {owner && repo && (
+            <div className="text-sm text-gray-500 -mt-4 text-center">
+              Checking: <span className="text-gray-400 font-mono">https://api.github.com/repos/{owner}/{repo}/contributors</span>
+            </div>
+          )}
 
           {/* GitHub Token Input */}
           <div className="space-y-4">
@@ -198,6 +256,22 @@ export default function Home() {
               {isVerifying ? 'Verifying...' : 'Verify Proof'}
             </button>
           </div>
+
+          {/* Download Proof Button */}
+          {presentation && (
+            <div className="flex justify-center">
+              <button
+                onClick={handleDownloadProof}
+                disabled={isProving || isVerifying}
+                className="px-6 py-3 bg-gray-800 hover:bg-gray-700 disabled:bg-gray-900 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors border border-gray-600 hover:border-gray-500 flex items-center gap-2"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Download Webproof
+              </button>
+            </div>
+          )}
 
           {/* Error Display */}
           {error && (

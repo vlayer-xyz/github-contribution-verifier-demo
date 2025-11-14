@@ -50,6 +50,19 @@ npm run dev
 
 - `POST /api/prove` - Generate cryptographic proof of GitHub API data
 - `POST /api/verify` - Verify the generated proof and extract contribution data
+- `GET /api/verify-all` - Verify all webproofs stored in the `/app/webproofs` folder
+
+## Features
+
+### Download Webproof
+After generating a proof, you can download it as a JSON file to your local machine for safekeeping or sharing.
+
+### Verify All Contributors
+Navigate to `/verify-all` to see all verified contributors from stored webproofs. This page automatically:
+- Reads all webproof JSON files from the `/app/webproofs` folder
+- Verifies each proof using vlayer's API
+- Displays contributor information including username, profile picture, GitHub URL, and contribution count
+- Shows aggregated statistics
 
 ## Documentation
 
