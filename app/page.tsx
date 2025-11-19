@@ -12,6 +12,10 @@ export default function Home() {
   const [presentation, setPresentation] = useState<any>(null);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showUploadInstructions, setShowUploadInstructions] = useState(false);
+  
+  // Get upload URL from environment variable or default to /upload
+  const uploadUrl = process.env.NEXT_PUBLIC_UPLOAD_URL || '/upload';
 
   const handleProve = async () => {
     if (!owner.trim()) {
@@ -141,6 +145,9 @@ export default function Home() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+    
+    // Show upload instructions after download
+    setShowUploadInstructions(true);
   };
 
   return (
@@ -151,7 +158,7 @@ export default function Home() {
           <p className="text-gray-400 text-lg">Prove contributions to GitHub repositories</p>
           <div className="mt-6">
             <a
-              href="/verify-all"
+              href="/contributions"
               className="inline-flex items-center px-4 py-2 text-sm text-gray-300 hover:text-white border border-gray-700 hover:border-gray-500 rounded-lg transition-colors"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -259,17 +266,57 @@ export default function Home() {
 
           {/* Download Proof Button */}
           {presentation && (
-            <div className="flex justify-center">
-              <button
-                onClick={handleDownloadProof}
-                disabled={isProving || isVerifying}
-                className="px-6 py-3 bg-gray-800 hover:bg-gray-700 disabled:bg-gray-900 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors border border-gray-600 hover:border-gray-500 flex items-center gap-2"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                Download Webproof
-              </button>
+            <div className="space-y-4">
+              <div className="flex justify-center">
+                <button
+                  onClick={handleDownloadProof}
+                  disabled={isProving || isVerifying}
+                  className="px-6 py-3 bg-gray-800 hover:bg-gray-700 disabled:bg-gray-900 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors border border-gray-600 hover:border-gray-500 flex items-center gap-2"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Download Webproof
+                </button>
+              </div>
+
+              {/* Upload Instructions */}
+              {showUploadInstructions && (
+                <div className="p-6 bg-[#7235e5]/10 border border-[#7235e5]/30 rounded-lg">
+                  <div className="flex items-start space-x-3 mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-[#7235e5] flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-medium text-white mb-2">Next Step: Upload Your Proof</h3>
+                      <p className="text-gray-300 text-sm mb-4">
+                        Your webproof has been downloaded. To store it in the database and verify your contributions, upload it using the link below.
+                      </p>
+                      <a
+                        href={uploadUrl}
+                        className="inline-flex items-center px-4 py-2 bg-[#7235e5] hover:bg-[#5d2bc7] text-white font-medium rounded-lg transition-colors gap-2"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
+                        Go to Upload Page
+                      </a>
+                      <p className="text-gray-400 text-xs mt-3">
+                        Upload URL: <code className="px-2 py-1 bg-gray-800 rounded text-gray-300">{uploadUrl}</code>
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setShowUploadInstructions(false)}
+                      className="text-gray-400 hover:text-white transition-colors"
+                      aria-label="Close instructions"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
