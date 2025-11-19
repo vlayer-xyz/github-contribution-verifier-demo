@@ -7,15 +7,60 @@ export default function Home() {
   const [repo, setRepo] = useState('');
   const [githubToken, setGithubToken] = useState('');
   const [username, setUsername] = useState('');
+  const [contributorHandles, setContributorHandles] = useState('');
   const [isProving, setIsProving] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [isFetchingContributors, setIsFetchingContributors] = useState(false);
+  const [contributorsPreview, setContributorsPreview] = useState<any[]>([]);
   const [presentation, setPresentation] = useState<any>(null);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [showUploadInstructions, setShowUploadInstructions] = useState(false);
   
   // Get upload URL from environment variable or default to /upload
-  const uploadUrl = process.env.NEXT_PUBLIC_UPLOAD_URL || '/upload';
+  const uploadUrl = process.env.NEXT_PUBLIC_UPLOAD_URL || 'https://github-contribution-verifier-demo.vercel.app/upload';
+
+  const handleFetchContributors = async () => {
+    if (!owner.trim()) {
+      setError('Please enter the repository owner');
+      return;
+    }
+
+    if (!repo.trim()) {
+      setError('Please enter the repository name');
+      return;
+    }
+
+    setIsFetchingContributors(true);
+    setError(null);
+    setContributorsPreview([]);
+
+    const url = `https://api.github.com/repos/${owner.trim()}/${repo.trim()}/contributors`;
+
+    try {
+      const headers: Record<string, string> = {
+        'Accept': 'application/vnd.github+json',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+      };
+
+      if (githubToken.trim()) {
+        headers['Authorization'] = `Bearer ${githubToken.trim()}`;
+      }
+
+      const response = await fetch(url, { headers });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const contributors = await response.json();
+      setContributorsPreview(contributors);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch contributors');
+    } finally {
+      setIsFetchingContributors(false);
+    }
+  };
 
   const handleProve = async () => {
     if (!owner.trim()) {
@@ -64,6 +109,28 @@ export default function Home() {
       setIsProving(false);
     }
   };
+
+  // Filter contributors based on handles input
+  const getFilteredContributors = () => {
+    if (!contributorHandles.trim()) {
+      return contributorsPreview;
+    }
+
+    const handles = contributorHandles
+      .split(',')
+      .map(h => h.trim().toLowerCase())
+      .filter(h => h.length > 0);
+
+    if (handles.length === 0) {
+      return contributorsPreview;
+    }
+
+    return contributorsPreview.filter((contributor: any) =>
+      handles.includes(contributor.login?.toLowerCase())
+    );
+  };
+
+  const filteredContributors = getFilteredContributors();
 
   const handleVerify = async () => {
     if (!presentation) {
@@ -228,6 +295,72 @@ export default function Home() {
               </a>
             </p>
           </div>
+
+          {/* Contributor Handles Filter (Optional) */}
+          <div className="space-y-4">
+            <label htmlFor="contributor-handles" className="block text-sm font-medium text-gray-300">
+              Filter Contributors by Handles (Optional)
+            </label>
+            <input
+              id="contributor-handles"
+              type="text"
+              value={contributorHandles}
+              onChange={(e) => setContributorHandles(e.target.value)}
+              placeholder="username1, username2, username3"
+              className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#7235e5] focus:border-transparent text-white placeholder-gray-500"
+              disabled={isProving || isVerifying || isFetchingContributors}
+            />
+            <p className="text-xs text-gray-500">
+              Comma-separated list of GitHub usernames to filter. Note: The proof will still include all contributors, but you can preview which ones match your filter.
+            </p>
+            <button
+              onClick={handleFetchContributors}
+              disabled={!owner.trim() || !repo.trim() || isProving || isVerifying || isFetchingContributors}
+              className="px-4 py-2 bg-gray-800 hover:bg-gray-700 disabled:bg-gray-900 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors border border-gray-600 hover:border-gray-500"
+            >
+              {isFetchingContributors ? 'Loading...' : 'Preview Contributors'}
+            </button>
+          </div>
+
+          {/* Contributors Preview */}
+          {contributorsPreview.length > 0 && (
+            <div className="p-4 bg-gray-900 border border-gray-700 rounded-lg">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-medium text-gray-300">
+                  Contributors Preview {contributorHandles.trim() && `(Filtered: ${filteredContributors.length} of ${contributorsPreview.length})`}
+                </h3>
+                {!contributorHandles.trim() && (
+                  <span className="text-xs text-gray-500">{contributorsPreview.length} total</span>
+                )}
+              </div>
+              <div className="max-h-48 overflow-y-auto space-y-2">
+                {filteredContributors.length === 0 ? (
+                  <p className="text-sm text-gray-400 text-center py-4">
+                    No contributors match the filter &quot;{contributorHandles}&quot;
+                  </p>
+                ) : (
+                  filteredContributors.slice(0, 10).map((contributor: any, index: number) => (
+                    <div key={index} className="flex items-center space-x-3 p-2 bg-gray-800 rounded">
+                      <img
+                        src={contributor.avatar_url}
+                        alt={contributor.login}
+                        className="w-8 h-8 rounded-full"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-white truncate">@{contributor.login}</p>
+                        <p className="text-xs text-gray-400">{contributor.contributions} contributions</p>
+                      </div>
+                    </div>
+                  ))
+                )}
+                {filteredContributors.length > 10 && (
+                  <p className="text-xs text-gray-500 text-center pt-2">
+                    Showing 10 of {filteredContributors.length} contributors
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Username Input */}
           <div className="space-y-4">
