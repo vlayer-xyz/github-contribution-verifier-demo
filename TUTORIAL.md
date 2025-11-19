@@ -35,7 +35,7 @@ npm install
 
 ### Step 4: Configure Environment Variables
 
-Obtain your vlayer API credentials (`WEB_PROVER_API_CLIENT_ID` and `WEB_PROVER_API_SECRET`) from the vlayer table at the event.
+Obtain your vlayer API credentials (`WEB_PROVER_API_CLIENT_ID` and `WEB_PROVER_API_SECRET`) from the vlayer table at the event after filling out [this form](https://gplxanr6y5w.typeform.com/vlayer-hack)
 
 Create a `.env.local` file in the project root:
 
