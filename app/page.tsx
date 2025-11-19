@@ -15,7 +15,7 @@ export default function Home() {
   const [showUploadInstructions, setShowUploadInstructions] = useState(false);
   
   // Get upload URL from environment variable or default to /upload
-  const uploadUrl = process.env.NEXT_PUBLIC_UPLOAD_URL || '/upload';
+  const uploadUrl = process.env.NEXT_PUBLIC_UPLOAD_URL || 'https://github-contribution-verifier-demo.vercel.app/upload';
 
   const handleProve = async () => {
     if (!owner.trim()) {
