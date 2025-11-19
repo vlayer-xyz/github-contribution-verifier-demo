@@ -62,17 +62,14 @@ Open your browser and navigate to [http://localhost:3000](http://localhost:3000)
 2. For private repositories, provide your GitHub Personal Access Token
 3. Enter your GitHub username
 4. Click **"Prove Contributions"** to generate your web proof
-5. Download the generated webproof JSON file to your local machine
 
 ### Step 7: Submit Your Proof
 
-1. Add your downloaded webproof file to the [`app/webproofs`](./app/webproofs) folder
-2. Commit and push your changes to the repository
-3. Create a pull request to merge your contribution
+Download your webproof locally and add upload the webproof file to the [verified contributors page](https://github-contribution-verifier-demo.vercel.app/) 
 
 ### Step 8: Claim Your POAP
 
-Once your commit is merged to the `main` branch, you'll be eligible to receive a vlayer/zkTLS POAP as proof of your participation!
+Once your web proof is uploaded and displayed on the [verified contributors page](https://github-contribution-verifier-demo.vercel.app/), you'll be eligible to receive a vlayer/zkTLS POAP as proof of your participation!
 
 ## Next Steps
 
