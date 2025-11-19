@@ -7,17 +7,58 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
-    const requestBody = {
-      url: body.url,
-      headers: body.headers || [
-        "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36",
-        "Accept: application/vnd.github+json"
-      ]
-    };
+    // Check if this is a GraphQL request (has query) or legacy REST request (has url)
+    let requestBody;
     
-    console.log('Sending to vlayer API:', JSON.stringify(requestBody, null, 2));
-    console.log('URL being proved:', requestBody.url);
-    console.log('Headers being sent:', requestBody.headers);
+    if (body.query) {
+      // GraphQL request
+      const graphqlUrl = 'https://api.github.com/graphql';
+      const graphqlBody = JSON.stringify({
+        query: body.query,
+        ...(body.variables && Object.keys(body.variables).length > 0 && { variables: body.variables })
+      });
+      
+      // Construct headers for GraphQL request
+      const headers = [
+        "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36",
+        "Content-Type: application/json",
+        "Accept: application/vnd.github+json"
+      ];
+      
+      if (body.githubToken) {
+        headers.push(`Authorization: Bearer ${body.githubToken}`);
+      }
+      
+      requestBody = {
+        url: graphqlUrl,
+        method: 'POST',
+        headers: headers,
+        body: graphqlBody
+      };
+      
+      console.log('Sending GraphQL request to vlayer API');
+      console.log('GraphQL URL:', graphqlUrl);
+      console.log('Variables:', JSON.stringify(body.variables, null, 2));
+    } else if (body.url) {
+      // Legacy REST request (for backward compatibility)
+      requestBody = {
+        url: body.url,
+        headers: body.headers || [
+          "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36",
+          "Accept: application/vnd.github+json"
+        ]
+      };
+      
+      console.log('Sending REST request to vlayer API');
+      console.log('URL being proved:', requestBody.url);
+    } else {
+      return NextResponse.json(
+        { error: 'Either query (GraphQL) or url (REST) must be provided' },
+        { status: 400 }
+      );
+    }
+    
+    console.log('Request body:', JSON.stringify(requestBody, null, 2));
     
     const response = await fetch('https://web-prover.vlayer.xyz/api/v1/prove', {
       method: 'POST',
@@ -50,7 +91,7 @@ export async function POST(request: NextRequest) {
     }
     
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to prove URL' },
+      { error: error instanceof Error ? error.message : 'Failed to prove request' },
       { status: 500 }
     );
   }

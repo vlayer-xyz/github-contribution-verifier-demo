@@ -9,8 +9,13 @@ export default function Home() {
   const [username, setUsername] = useState('');
   const [isProving, setIsProving] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
-  const [presentation, setPresentation] = useState<any>(null);
-  const [result, setResult] = useState<any>(null);
+  const [presentation, setPresentation] = useState<Record<string, unknown> | null>(null);
+  const [result, setResult] = useState<{ 
+    type: string; 
+    data: Record<string, unknown> & { 
+      contributionData?: { username: string; total: number; avatar: string } 
+    } 
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showUploadInstructions, setShowUploadInstructions] = useState(false);
   
@@ -28,12 +33,39 @@ export default function Home() {
       return;
     }
 
+    if (!username.trim()) {
+      setError('Please enter your GitHub username first');
+      return;
+    }
+
+    if (!githubToken.trim()) {
+      setError('GitHub token is required for GraphQL API');
+      return;
+    }
+
     setIsProving(true);
     setError(null);
     setResult(null);
 
-    // Construct the GitHub API URL
-    const url = `https://api.github.com/repos/${owner.trim()}/${repo.trim()}/contributors`;
+    // Construct GraphQL query for merged PR count filtered by author
+    // Using search query since pullRequests doesn't support author filtering
+    // Note: GraphQL variables can't be used in string literals, so we build the query string in JavaScript
+    const searchQuery = `repo:${owner.trim()}/${repo.trim()} is:pr is:merged author:${username.trim()}`;
+    
+    const graphqlQuery = `
+      query MergedPrCount {
+        search(
+          query: "${searchQuery}"
+          type: ISSUE
+          first: 1
+        ) {
+          issueCount
+        }
+      }
+    `;
+    
+    console.log('GraphQL Query:', graphqlQuery);
+    console.log('Search Query String:', searchQuery);
 
     try {
       const response = await fetch('/api/prove', {
@@ -42,12 +74,8 @@ export default function Home() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          url,
-          headers: [
-            "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36",
-            "Accept: application/vnd.github+json",
-            ...(githubToken.trim() ? [`Authorization: Bearer ${githubToken.trim()}`] : [])
-          ]
+          query: graphqlQuery,
+          githubToken: githubToken.trim()
         })
       });
 
@@ -59,7 +87,7 @@ export default function Home() {
       setPresentation(data);
       setResult({ type: 'prove', data });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to prove URL');
+      setError(err instanceof Error ? err.message : 'Failed to prove GraphQL query');
     } finally {
       setIsProving(false);
     }
@@ -67,7 +95,7 @@ export default function Home() {
 
   const handleVerify = async () => {
     if (!presentation) {
-      setError('Please prove a URL first');
+      setError('Please prove merged PRs first');
       return;
     }
 
@@ -94,26 +122,55 @@ export default function Home() {
 
       const data = await response.json();
       
-      // Parse GitHub contributors data
+      // Parse GraphQL PR response and transform to contributor format
       let contributionData = null;
       if (data.response && data.response.body) {
         try {
-          const contributors = JSON.parse(data.response.body);
-          const userContributions = contributors.find((contributor: any) => 
-            contributor.login && contributor.login.toLowerCase() === username.trim().toLowerCase()
-          );
+          const responseBody = JSON.parse(data.response.body);
           
-          if (userContributions) {
-            contributionData = {
-              username: userContributions.login,
-              total: userContributions.contributions,
-              avatar: userContributions.avatar_url
-            };
-          } else {
-            setError(`No contributions found for username: ${username.trim()}`);
+          // Debug: Log the full response structure to verify what we're getting
+          console.log('GraphQL Response Body:', JSON.stringify(responseBody, null, 2));
+          
+          // Handle GraphQL search query response (filtered by author)
+          let prCount = 0;
+          
+          if (responseBody.data?.search?.issueCount !== undefined) {
+            // Search query returns issueCount for filtered results
+            prCount = responseBody.data.search.issueCount;
+            console.log(`Found ${prCount} merged PRs by ${username.trim()} in repository`);
+          } else if (responseBody.data?.repository?.pullRequests?.nodes) {
+            // Fallback: if using old repository.pullRequests query, filter nodes by author
+            const targetUsername = username.trim().toLowerCase();
+            const matchingPRs = responseBody.data.repository.pullRequests.nodes.filter((pr: { author?: { login?: string } }) => {
+              const authorLogin = pr.author?.login?.toLowerCase();
+              return authorLogin === targetUsername;
+            });
+            prCount = matchingPRs.length;
+            console.log(`Found ${prCount} merged PRs by ${username.trim()} out of ${responseBody.data.repository.pullRequests.nodes.length} total PRs`);
+          } else if (responseBody.data?.repository?.pullRequests?.totalCount !== undefined) {
+            // Fallback: if only totalCount available (shouldn't happen with search query)
+            console.warn('WARNING: Only totalCount available, cannot filter by author.');
+            prCount = responseBody.data.repository.pullRequests.totalCount;
+          } else if (Array.isArray(responseBody)) {
+            // Fallback: if it's already an array
+            prCount = responseBody.length;
+            console.log('Using array length:', prCount);
+          }
+          
+          if (prCount === 0) {
+            setError(`No merged PRs found for @${username.trim()} in repository`);
             return;
           }
-        } catch (parseError) {
+
+          // Construct avatar URL from username
+          const avatar = `https://github.com/${username.trim()}.png`;
+
+          contributionData = {
+            username: username.trim(),
+            total: prCount,
+            avatar: avatar
+          };
+        } catch {
           setError('Failed to parse contribution data');
           return;
         }
@@ -201,16 +258,16 @@ export default function Home() {
               />
             </div>
           </div>
-          {owner && repo && (
+          {owner && repo && username && (
             <div className="text-sm text-gray-500 -mt-4 text-center">
-              Checking: <span className="text-gray-400 font-mono">https://api.github.com/repos/{owner}/{repo}/contributors</span>
+              Checking: <span className="text-gray-400 font-mono">Merged PRs by @{username} in {owner}/{repo}</span>
             </div>
           )}
 
           {/* GitHub Token Input */}
           <div className="space-y-4">
             <label htmlFor="token" className="block text-sm font-medium text-gray-300">
-              GitHub Personal Access Token (for private repos)
+              GitHub Personal Access Token <span className="text-red-400">*</span>
             </label>
             <input
               id="token"
@@ -222,7 +279,7 @@ export default function Home() {
               disabled={isProving || isVerifying}
             />
             <p className="text-xs text-gray-500">
-              Required for private repositories. Generate one at{' '}
+              Required for GraphQL API access. Generate one at{' '}
               <a href="https://github.com/settings/personal-access-tokens" target="_blank" rel="noopener noreferrer" className="text-[#7235e5] hover:underline">
                 GitHub Settings → Developer settings → Personal access tokens
               </a>
@@ -232,7 +289,7 @@ export default function Home() {
           {/* Username Input */}
           <div className="space-y-4">
             <label htmlFor="username" className="block text-sm font-medium text-gray-300">
-              Your GitHub Username
+              Your GitHub Username <span className="text-red-400">*</span>
             </label>
             <input
               id="username"
@@ -243,16 +300,19 @@ export default function Home() {
               className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#7235e5] focus:border-transparent text-white placeholder-gray-500"
               disabled={isProving || isVerifying}
             />
+            <p className="text-xs text-gray-500">
+              Required to filter merged PRs by your GitHub username.
+            </p>
           </div>
 
           {/* Action Buttons */}
           <div className="flex gap-4">
             <button
               onClick={handleProve}
-              disabled={isProving || isVerifying}
+              disabled={!username.trim() || !githubToken.trim() || isProving || isVerifying}
               className="flex-1 px-6 py-3 bg-[#7235e5] hover:bg-[#5d2bc7] disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
             >
-              {isProving ? 'Proving...' : 'Prove Contributions'}
+              {isProving ? 'Proving...' : 'Prove Merged PRs'}
             </button>
             
             <button
