@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
+import { transformGraphQLPRResponse, extractRepoInfo } from '@/lib/graphql-transformer';
 
 // Configure max duration for Vercel (up to 90 seconds)
 export const maxDuration = 90;
@@ -55,33 +56,11 @@ export async function POST(request: NextRequest) {
     }
 
     const verifyData = await verifyResponse.json();
+
+    console.log('Verify data:', verifyData);
     
     // Extract repository info from the verified response
-    let repoOwner: string | null = null;
-    let repoName: string | null = null;
-    
-    try {
-      // Try multiple locations where the URL might be
-      let urlToMatch = null;
-      
-      if (verifyData?.response?.url) {
-        urlToMatch = verifyData.response.url;
-      } else if (verifyData?.request?.url) {
-        urlToMatch = verifyData.request.url;
-      } else if (verifyData?.response?.request) {
-        urlToMatch = verifyData.response.request;
-      }
-      
-      if (urlToMatch) {
-        const urlMatch = urlToMatch.match(/\/repos\/([^\/]+)\/([^\/]+)\/contributors/);
-        if (urlMatch) {
-          repoOwner = urlMatch[1];
-          repoName = urlMatch[2];
-        }
-      }
-    } catch (e) {
-      console.error('Could not extract repo info from response:', e);
-    }
+    const { owner: repoOwner, name: repoName } = extractRepoInfo(verifyData);
 
     if (!repoOwner || !repoName) {
       return NextResponse.json(
@@ -91,6 +70,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Parse the response body to extract contributor data
+    // Handle GraphQL PR response, contributors API, and commits API (for backward compatibility)
     let githubUsername: string | null = null;
     let contributionCount: number | null = null;
     let avatarUrl: string | null = null;
@@ -98,31 +78,20 @@ export async function POST(request: NextRequest) {
 
     if (verifyData.response && verifyData.response.body) {
       try {
-        const contributorsData = JSON.parse(verifyData.response.body);
+        const responseBody = verifyData.response.body;
+        const contributorData = transformGraphQLPRResponse(responseBody, username.trim());
         
-        if (Array.isArray(contributorsData)) {
-          // Find the contributor matching the provided username
-          const targetContributor = contributorsData.find((c: any) => 
-            c.login && c.login.toLowerCase() === username.trim().toLowerCase()
-          );
-          
-          if (!targetContributor) {
-            return NextResponse.json(
-              { error: `No contributions found for username: ${username.trim()}` },
-              { status: 404 }
-            );
-          }
-
-          githubUsername = targetContributor.login;
-          contributionCount = targetContributor.contributions;
-          avatarUrl = targetContributor.avatar_url || null;
-          githubUrl = targetContributor.html_url || null;
-        } else {
+        if (!contributorData) {
           return NextResponse.json(
-            { error: 'Invalid contributors data format' },
-            { status: 400 }
+            { error: `No contributions found for username: ${username.trim()}` },
+            { status: 404 }
           );
         }
+
+        githubUsername = contributorData.username;
+        contributionCount = contributorData.contributions;
+        avatarUrl = contributorData.avatar;
+        githubUrl = contributorData.githubUrl;
       } catch (parseError) {
         console.error('Failed to parse contributor data:', parseError);
         return NextResponse.json(

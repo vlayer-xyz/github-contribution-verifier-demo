@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { readdir, readFile } from 'fs/promises';
 import { join } from 'path';
+import { transformGraphQLPRResponse, extractRepoInfo } from '@/lib/graphql-transformer';
 
 // Configure max duration for Vercel
 export const maxDuration = 300;
@@ -78,75 +79,31 @@ export async function GET() {
         console.log('Verify response structure:', JSON.stringify(verifyData, null, 2));
         
         // Extract repository info from the verified response
-        let repoOwner: string | null = null;
-        let repoName: string | null = null;
-        try {
-          // Try multiple locations where the URL might be
-          let urlToMatch = null;
-          
-          // Check different possible locations
-          if (verifyData?.response?.url) {
-            urlToMatch = verifyData.response.url;
-          } else if (verifyData?.request?.url) {
-            urlToMatch = verifyData.request.url;
-          } else if (verifyData?.response?.request) {
-            urlToMatch = verifyData.response.request;
-          }
-          
-          console.log('URL to match:', urlToMatch);
-          
-          if (urlToMatch) {
-            const urlMatch = urlToMatch.match(/\/repos\/([^\/]+)\/([^\/]+)\/contributors/);
-            if (urlMatch) {
-              repoOwner = urlMatch[1];
-              repoName = urlMatch[2];
-              console.log(`Extracted repo: ${repoOwner}/${repoName}`);
-            }
-          }
-        } catch (e) {
-          console.log('Could not extract repo info from response:', e);
-        }
+        const { owner: repoOwner, name: repoName } = extractRepoInfo(verifyData);
+        console.log(`Extracted repo: ${repoOwner}/${repoName}`);
         
         // Parse the response body to extract contributor data
+        // Handle GraphQL PR response, contributors API, and commits API (for backward compatibility)
         if (verifyData.response && verifyData.response.body) {
           try {
-            const contributorsData = JSON.parse(verifyData.response.body);
+            const responseBody = verifyData.response.body;
+            const contributorData = transformGraphQLPRResponse(responseBody, targetUsername || undefined);
             
-            // Extract only the specific contributor that was verified
-            if (Array.isArray(contributorsData)) {
-              let targetContributor = null;
-              
-              console.log(`Found ${contributorsData.length} contributors in data`);
-              
-              if (targetUsername) {
-                // Find the contributor matching the username from filename
-                console.log(`Looking for username: ${targetUsername}`);
-                targetContributor = contributorsData.find((c: any) => 
-                  c.login && c.login.toLowerCase() === targetUsername.toLowerCase()
-                );
-                console.log(`Found contributor:`, targetContributor ? targetContributor.login : 'NOT FOUND');
-              } else {
-                // Fallback: use the first contributor if no username in filename
-                console.log('No username in filename, using first contributor');
-                targetContributor = contributorsData[0];
-              }
-              
-              if (targetContributor && targetContributor.login) {
-                console.log(`Adding contributor: ${targetContributor.login} with ${targetContributor.contributions} contributions`);
-                const repoUrl = repoOwner && repoName ? `https://github.com/${repoOwner}/${repoName}` : undefined;
-                contributors.push({
-                  username: targetContributor.login,
-                  contributions: targetContributor.contributions,
-                  avatar: targetContributor.avatar_url,
-                  githubUrl: targetContributor.html_url,
-                  verified: true,
-                  repoOwner: repoOwner || undefined,
-                  repoName: repoName || undefined,
-                  repoUrl
-                });
-              } else {
-                console.log(`No valid contributor found for ${file}`);
-              }
+            if (contributorData) {
+              console.log(`Adding contributor: ${contributorData.username} with ${contributorData.contributions} contributions`);
+              const repoUrl = repoOwner && repoName ? `https://github.com/${repoOwner}/${repoName}` : undefined;
+              contributors.push({
+                username: contributorData.username,
+                contributions: contributorData.contributions,
+                avatar: contributorData.avatar,
+                githubUrl: contributorData.githubUrl,
+                verified: true,
+                repoOwner: repoOwner || undefined,
+                repoName: repoName || undefined,
+                repoUrl
+              });
+            } else {
+              console.log(`No valid contributor data found for ${file}`);
             }
           } catch (parseError) {
             console.error(`Failed to parse contributor data from ${file}:`, parseError);
