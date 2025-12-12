@@ -121,7 +121,13 @@ export async function GET() {
               if (targetUsername) {
                 // Find the contributor matching the username from filename
                 console.log(`Looking for username: ${targetUsername}`);
-                targetContributor = contributorsData.find((c: any) => 
+                interface GitHubContributor {
+                  login: string;
+                  contributions: number;
+                  avatar_url?: string;
+                  html_url?: string;
+                }
+                targetContributor = contributorsData.find((c: GitHubContributor) => 
                   c.login && c.login.toLowerCase() === targetUsername.toLowerCase()
                 );
                 console.log(`Found contributor:`, targetContributor ? targetContributor.login : 'NOT FOUND');
@@ -148,8 +154,8 @@ export async function GET() {
                 console.log(`No valid contributor found for ${file}`);
               }
             }
-          } catch (parseError) {
-            console.error(`Failed to parse contributor data from ${file}:`, parseError);
+          } catch {
+            console.error(`Failed to parse contributor data from ${file}`);
           }
         }
       } catch (fileError) {

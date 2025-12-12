@@ -3,10 +3,15 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
+
+interface WebProof {
+  [key: string]: unknown;
+}
 
 export default function UploadPage() {
   const router = useRouter();
-  const [proof, setProof] = useState<any>(null);
+  const [proof, setProof] = useState<WebProof | null>(null);
   const [username, setUsername] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,7 +28,7 @@ export default function UploadPage() {
         const parsed = JSON.parse(content);
         setProof(parsed);
         setError(null);
-      } catch (err) {
+      } catch {
         setError('Invalid JSON file. Please upload a valid webproof JSON file.');
         setProof(null);
       }
@@ -149,7 +154,7 @@ export default function UploadPage() {
               disabled={isUploading}
             />
             <p className="text-xs text-gray-500">
-              Enter the GitHub username that matches the webproof you're uploading
+              Enter the GitHub username that matches the webproof you&apos;re uploading
             </p>
           </div>
 
@@ -194,7 +199,7 @@ export default function UploadPage() {
           <div className="p-4 bg-gray-900 border border-gray-700 rounded-lg">
             <h3 className="text-sm font-medium text-gray-300 mb-2">How to use:</h3>
             <ol className="text-xs text-gray-400 space-y-1 list-decimal list-inside">
-              <li>Generate a webproof on the home page using "Prove Contributions"</li>
+              <li>Generate a webproof on the home page using &quot;Prove Contributions&quot;</li>
               <li>Download the webproof JSON file</li>
               <li>Upload it here along with your GitHub username</li>
               <li>Your verified contributions will be stored in the database</li>
@@ -206,9 +211,11 @@ export default function UploadPage() {
         <div className="mt-16 pt-8 border-t border-gray-800">
           <div className="flex justify-center items-center space-x-2 text-gray-500">
             <span className="text-sm">Powered by</span>
-            <img 
+            <Image 
               src="/powered-by-vlayer.svg" 
               alt="Vlayer" 
+              width={100}
+              height={20}
               className="h-5"
             />
           </div>

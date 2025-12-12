@@ -21,7 +21,15 @@ export async function GET() {
     `;
 
     // Transform database results to match the ContributorData interface
-    const contributors = results.map((row: any) => {
+    interface DbRow {
+      github_username: string;
+      repo_owner: string | null;
+      repo_name: string | null;
+      contribution_count: number;
+      avatar_url: string | null;
+      github_url: string | null;
+    }
+    const contributors = (results as DbRow[]).map((row) => {
       // Construct GitHub avatar URL if not stored
       let avatar = row.avatar_url;
       if (!avatar && row.github_username) {

@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
     let body;
     try {
       body = await request.json();
-    } catch (parseError) {
+    } catch {
       return NextResponse.json(
         { error: 'Invalid JSON in request body' },
         { status: 400 }
@@ -102,7 +102,13 @@ export async function POST(request: NextRequest) {
         
         if (Array.isArray(contributorsData)) {
           // Find the contributor matching the provided username
-          const targetContributor = contributorsData.find((c: any) => 
+          interface GitHubContributor {
+            login: string;
+            contributions: number;
+            avatar_url?: string;
+            html_url?: string;
+          }
+          const targetContributor = contributorsData.find((c: GitHubContributor) => 
             c.login && c.login.toLowerCase() === username.trim().toLowerCase()
           );
           
@@ -123,8 +129,8 @@ export async function POST(request: NextRequest) {
             { status: 400 }
           );
         }
-      } catch (parseError) {
-        console.error('Failed to parse contributor data:', parseError);
+      } catch {
+        console.error('Failed to parse contributor data');
         return NextResponse.json(
           { error: 'Failed to parse contribution data from verification response' },
           { status: 400 }

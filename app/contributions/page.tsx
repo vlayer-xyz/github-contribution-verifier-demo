@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 
 interface Contributor {
   username: string;
@@ -129,9 +130,11 @@ export default function ContributionsPage() {
                       className="p-6 bg-gray-900 border border-gray-700 rounded-lg"
                     >
                       <div className="flex items-start space-x-4 mb-4">
-                        <img
+                        <Image
                           src={contributor.avatar}
                           alt={contributor.username}
+                          width={64}
+                          height={64}
                           className="w-16 h-16 rounded-full"
                         />
                         <div className="flex-1 min-w-0">
@@ -199,9 +202,11 @@ export default function ContributionsPage() {
         <div className="mt-16 pt-8 border-t border-gray-800">
           <div className="flex justify-center items-center space-x-2 text-gray-500">
             <span className="text-sm">Powered by</span>
-            <img 
+            <Image 
               src="/powered-by-vlayer.svg" 
               alt="Vlayer" 
+              width={100}
+              height={20}
               className="h-5"
             />
           </div>
